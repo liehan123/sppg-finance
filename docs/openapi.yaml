@@ -1,0 +1,2005 @@
+openapi: 3.0.3
+info:
+  title: SPPG MBG Financial Reporting API
+  version: 1.0.0
+  description: >
+    OpenAPI untuk Web App Laporan Keuangan SPPG (MBG):
+    mencakup transaksi (VA & petty cash), bukti/lampiran, penyaluran, pajak,
+    laporan harian/2-mingguan/bulanan, BAST, bundling LPJ (ZIP), approval workflow, dan audit log.
+
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: https://staging-api.example.com
+    description: Staging
+
+tags:
+  - name: Auth
+  - name: Master
+  - name: Attachments
+  - name: Expenses
+  - name: PettyCash
+  - name: VA
+  - name: Taxes
+  - name: Distributions
+  - name: Reports
+  - name: Approvals
+  - name: Audit
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (email/HP + password)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              emailLogin:
+                value:
+                  identifier: "admin@sppg.id"
+                  password: "password123"
+              phoneLogin:
+                value:
+                  identifier: "085700000000"
+                  password: "password123"
+      responses:
+        "200":
+          description: Token akses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Token baru
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  /api/v1/me:
+    get:
+      tags: [Auth]
+      summary: Profil user + role + scope SPPG
+      responses:
+        "200":
+          description: Profil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+
+  # -------------------------
+  # MASTER DATA (minimal)
+  # -------------------------
+  /api/v1/sppg:
+    get:
+      tags: [Master]
+      summary: List SPPG (sesuai akses user)
+      responses:
+        "200":
+          description: Daftar SPPG
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SppgListResponse"
+    post:
+      tags: [Master]
+      summary: Buat SPPG
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SppgCreateRequest"
+      responses:
+        "201":
+          description: SPPG dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SppgResponse"
+
+  /api/v1/schools:
+    get:
+      tags: [Master]
+      summary: List sekolah
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+      responses:
+        "200":
+          description: Daftar sekolah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchoolListResponse"
+    post:
+      tags: [Master]
+      summary: Buat sekolah
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchoolCreateRequest"
+      responses:
+        "201":
+          description: Sekolah dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchoolResponse"
+
+  /api/v1/vendors:
+    get:
+      tags: [Master]
+      summary: List vendor
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+      responses:
+        "200":
+          description: Daftar vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorListResponse"
+    post:
+      tags: [Master]
+      summary: Buat vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorCreateRequest"
+      responses:
+        "201":
+          description: Vendor dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorResponse"
+
+  # -------------------------
+  # ATTACHMENTS
+  # -------------------------
+  /api/v1/attachments/presign:
+    post:
+      tags: [Attachments]
+      summary: Dapatkan URL upload (opsional, jika pakai object storage)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresignRequest"
+      responses:
+        "200":
+          description: URL upload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignResponse"
+
+  /api/v1/attachments:
+    post:
+      tags: [Attachments]
+      summary: Simpan metadata attachment (file_url sudah ter-upload)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachmentCreateRequest"
+      responses:
+        "201":
+          description: Attachment dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentResponse"
+
+  /api/v1/attachments/{id}:
+    get:
+      tags: [Attachments]
+      summary: Detail attachment
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    delete:
+      tags: [Attachments]
+      summary: Hapus attachment (hanya bila belum dipakai/locked)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "204":
+          description: Deleted
+        "409":
+          $ref: "#/components/responses/ConflictError"
+
+  # -------------------------
+  # EXPENSES
+  # -------------------------
+  /api/v1/expenses:
+    get:
+      tags: [Expenses]
+      summary: List transaksi pengeluaran
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+        - $ref: "#/components/parameters/StatusQuery"
+      responses:
+        "200":
+          description: Daftar pengeluaran
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseListResponse"
+    post:
+      tags: [Expenses]
+      summary: Buat transaksi pengeluaran (draft)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseCreateRequest"
+      responses:
+        "201":
+          description: Expense dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/expenses/{id}:
+    get:
+      tags: [Expenses]
+      summary: Detail pengeluaran
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    patch:
+      tags: [Expenses]
+      summary: Update expense (hanya draft/rejected)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseUpdateRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+
+  /api/v1/expenses/{id}/attachments:
+    post:
+      tags: [Expenses]
+      summary: Kaitkan attachment ke expense
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkAttachmentRequest"
+      responses:
+        "200":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+
+  # Workflow actions
+  /api/v1/expenses/{id}/submit:
+    post:
+      tags: [Expenses]
+      summary: Submit expense untuk review/approval
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Status berubah
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/expenses/{id}/review:
+    post:
+      tags: [Expenses]
+      summary: Review expense (Pengawas Keuangan)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+
+  /api/v1/expenses/{id}/approve-yayasan:
+    post:
+      tags: [Expenses]
+      summary: Otorisasi Yayasan (Maker Yayasan)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Approved by Yayasan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+
+  /api/v1/expenses/{id}/approve-kepala:
+    post:
+      tags: [Expenses]
+      summary: Otorisasi Kepala SPPG (Approver)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Approved by Kepala SPPG
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+
+  /api/v1/expenses/{id}/lock:
+    post:
+      tags: [Expenses]
+      summary: Lock expense (final)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+
+  /api/v1/expenses/{id}/reject:
+    post:
+      tags: [Expenses]
+      summary: Reject expense (kembali ke maker)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+
+  # -------------------------
+  # PETTY CASH
+  # -------------------------
+  /api/v1/petty-cash:
+    get:
+      tags: [PettyCash]
+      summary: List petty cash (kas kecil)
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: week
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Tanggal awal minggu (mis. Senin) untuk ringkasan
+      responses:
+        "200":
+          description: Daftar petty cash + ringkasan mingguan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashListResponse"
+    post:
+      tags: [PettyCash]
+      summary: Buat petty cash (draft) - amount <= 500000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PettyCashCreateRequest"
+      responses:
+        "201":
+          description: Petty cash dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/petty-cash/{id}:
+    get:
+      tags: [PettyCash]
+      summary: Detail petty cash
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+    patch:
+      tags: [PettyCash]
+      summary: Update petty cash (hanya draft/rejected)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PettyCashUpdateRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+
+  /api/v1/petty-cash/{id}/attachments:
+    post:
+      tags: [PettyCash]
+      summary: Kaitkan attachment struk/faktur ke petty cash
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkAttachmentRequest"
+      responses:
+        "200":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+
+  /api/v1/petty-cash/{id}/submit:
+    post:
+      tags: [PettyCash]
+      summary: Submit petty cash
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/petty-cash/{id}/review:
+    post:
+      tags: [PettyCash]
+      summary: Review petty cash (Pengawas Keuangan)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+
+  /api/v1/petty-cash/{id}/approve-yayasan:
+    post:
+      tags: [PettyCash]
+      summary: Otorisasi Yayasan
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Approved by Yayasan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+
+  /api/v1/petty-cash/{id}/approve-kepala:
+    post:
+      tags: [PettyCash]
+      summary: Otorisasi Kepala SPPG
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Approved by Kepala
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+
+  /api/v1/petty-cash/{id}/lock:
+    post:
+      tags: [PettyCash]
+      summary: Lock petty cash
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PettyCashResponse"
+
+  # -------------------------
+  # VA MUTATIONS (rekonsiliasi)
+  # -------------------------
+  /api/v1/va-mutations:
+    get:
+      tags: [VA]
+      summary: List mutasi VA
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+      responses:
+        "200":
+          description: Daftar mutasi VA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaMutationListResponse"
+    post:
+      tags: [VA]
+      summary: Input mutasi VA manual (opsional)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VaMutationCreateRequest"
+      responses:
+        "201":
+          description: Mutasi dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaMutationResponse"
+
+  /api/v1/va-mutations/import:
+    post:
+      tags: [VA]
+      summary: Import mutasi VA via CSV (opsional)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [sppg_id, file]
+              properties:
+                sppg_id:
+                  type: integer
+                  format: int64
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Hasil import
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaImportResponse"
+
+  /api/v1/va-balance:
+    get:
+      tags: [VA]
+      summary: Saldo VA versi sistem (berdasarkan mutasi)
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Saldo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VaBalanceResponse"
+
+  # -------------------------
+  # TAXES
+  # -------------------------
+  /api/v1/taxes:
+    get:
+      tags: [Taxes]
+      summary: List pajak periode
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - $ref: "#/components/parameters/FromQuery"
+        - $ref: "#/components/parameters/ToQuery"
+      responses:
+        "200":
+          description: Daftar pajak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxListResponse"
+    post:
+      tags: [Taxes]
+      summary: Buat tax record untuk sebuah expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxCreateRequest"
+      responses:
+        "201":
+          description: Tax record dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/taxes/{id}:
+    patch:
+      tags: [Taxes]
+      summary: Update tax record (misal isi deposit_date)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxUpdateRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/taxes/{id}/deposit-proof:
+    post:
+      tags: [Taxes]
+      summary: Kaitkan bukti setor pajak (attachment) ke tax record
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [attachment_id]
+              properties:
+                attachment_id:
+                  type: integer
+                  format: int64
+      responses:
+        "200":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxResponse"
+
+  # -------------------------
+  # DISTRIBUTIONS (penyaluran + bukti)
+  # -------------------------
+  /api/v1/distributions:
+    get:
+      tags: [Distributions]
+      summary: List penyaluran
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Daftar penyaluran
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionListResponse"
+    post:
+      tags: [Distributions]
+      summary: Buat data penyaluran (harian/per sekolah)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DistributionCreateRequest"
+      responses:
+        "201":
+          description: Distribution dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionResponse"
+
+  /api/v1/distributions/{id}:
+    get:
+      tags: [Distributions]
+      summary: Detail penyaluran
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/distributions/{id}/attachments:
+    post:
+      tags: [Distributions]
+      summary: Tambah bukti penyaluran (receipt/photo/video/attendance)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DistributionLinkAttachmentRequest"
+      responses:
+        "200":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionResponse"
+
+  # -------------------------
+  # REPORTS
+  # -------------------------
+  /api/v1/reports/daily/generate:
+    post:
+      tags: [Reports]
+      summary: Generate laporan harian
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "201":
+          description: Report harian dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/reports/biweekly/generate:
+    post:
+      tags: [Reports]
+      summary: Generate LPJ 2 mingguan (report biweekly)
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "201":
+          description: Report biweekly dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+
+  /api/v1/reports/monthly/generate:
+    post:
+      tags: [Reports]
+      summary: Generate laporan bulanan
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2026-02"
+      responses:
+        "201":
+          description: Report bulanan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+
+  /api/v1/reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Detail report
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Detail report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/reports/{id}/submit:
+    post:
+      tags: [Reports]
+      summary: Submit report untuk review/approval
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/reports/{id}/review:
+    post:
+      tags: [Reports]
+      summary: Review report (Pengawas Keuangan)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+
+  /api/v1/reports/{id}/approve-yayasan:
+    post:
+      tags: [Reports]
+      summary: Otorisasi report oleh Yayasan
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Approved by Yayasan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+
+  /api/v1/reports/{id}/approve-kepala:
+    post:
+      tags: [Reports]
+      summary: Otorisasi report oleh Kepala SPPG
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionNote"
+      responses:
+        "200":
+          description: Approved by Kepala
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+
+  /api/v1/reports/{id}/lock:
+    post:
+      tags: [Reports]
+      summary: Lock report (final)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+
+  /api/v1/reports/{id}/bast/generate:
+    post:
+      tags: [Reports]
+      summary: Generate BAST untuk report biweekly
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "201":
+          description: BAST dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BastResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/reports/{id}/bast:
+    get:
+      tags: [Reports]
+      summary: Ambil BAST dari report
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: BAST
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BastResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/reports/{id}/bundle/validate:
+    post:
+      tags: [Reports]
+      summary: Validasi kelengkapan paket LPJ (lampiran, BAST, dsb.)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Hasil validasi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateBundleResponse"
+
+  /api/v1/reports/{id}/bundle/generate:
+    post:
+      tags: [Reports]
+      summary: Generate ZIP bundle LPJ (setelah validasi OK)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "201":
+          description: Bundle dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BundleResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/reports/{id}/bundle:
+    get:
+      tags: [Reports]
+      summary: Ambil bundle LPJ (URL download)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Bundle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BundleResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  # -------------------------
+  # APPROVALS & AUDIT
+  # -------------------------
+  /api/v1/approvals/inbox:
+    get:
+      tags: [Approvals]
+      summary: Daftar item pending approval sesuai role user
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+      responses:
+        "200":
+          description: Inbox approvals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalInboxResponse"
+
+  /api/v1/audit-logs:
+    get:
+      tags: [Audit]
+      summary: Audit logs
+      parameters:
+        - $ref: "#/components/parameters/SppgIdQuery"
+        - name: entity_type
+          in: query
+          required: false
+          schema:
+            type: string
+            example: "expense"
+        - name: entity_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: Audit log list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    SppgIdQuery:
+      name: sppg_id
+      in: query
+      required: false
+      schema:
+        type: integer
+        format: int64
+      description: Jika user punya akses multi-SPPG, boleh dipakai untuk memilih scope.
+
+    FromQuery:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+
+    ToQuery:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+
+    StatusQuery:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [draft, submitted, reviewed, approved, locked, rejected]
+
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            unauthorized:
+              value:
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Token tidak valid atau sudah kedaluwarsa."
+
+    NotFoundError:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            notFound:
+              value:
+                error:
+                  code: "NOT_FOUND"
+                  message: "Data tidak ditemukan."
+
+    ValidationError:
+      description: Validation Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            validation:
+              value:
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "Data tidak valid."
+                  fields:
+                    amount: "must be <= 500000"
+
+    ConflictError:
+      description: Conflict (mis. sudah locked / status tidak sesuai)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            conflict:
+              value:
+                error:
+                  code: "CONFLICT"
+                  message: "Tidak dapat mengubah karena status sudah LOCKED."
+
+  schemas:
+    # ---- Common wrapper ----
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+
+    Meta:
+      type: object
+      properties:
+        request_id:
+          type: string
+
+    # ---- Auth ----
+    LoginRequest:
+      type: object
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+          description: Email atau nomor HP/WA
+        password:
+          type: string
+          format: password
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          required: [access_token, refresh_token]
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            token_type:
+              type: string
+              example: "Bearer"
+            expires_in:
+              type: integer
+              example: 3600
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    Role:
+      type: string
+      enum: [maker_yayasan, approver_kepala_sppg, pengawas_keuangan, auditor]
+
+    MeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            nama:
+              type: string
+            email:
+              type: string
+              nullable: true
+            phone:
+              type: string
+              nullable: true
+            roles:
+              type: array
+              items:
+                type: object
+                properties:
+                  sppg_id:
+                    type: integer
+                    format: int64
+                  role:
+                    $ref: "#/components/schemas/Role"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ---- Master ----
+    Sppg:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        yayasan_id: { type: integer, format: int64 }
+        nama: { type: string }
+        alamat: { type: string, nullable: true }
+        start_operational_date: { type: string, format: date, nullable: true }
+
+    SppgCreateRequest:
+      type: object
+      required: [yayasan_id, nama]
+      properties:
+        yayasan_id: { type: integer, format: int64 }
+        nama: { type: string }
+        alamat: { type: string, nullable: true }
+        start_operational_date: { type: string, format: date, nullable: true }
+
+    SppgResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Sppg" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    SppgListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Sppg" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    School:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        nama: { type: string }
+        alamat: { type: string, nullable: true }
+        pic_name: { type: string, nullable: true }
+        pic_phone: { type: string, nullable: true }
+
+    SchoolCreateRequest:
+      type: object
+      required: [sppg_id, nama]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        nama: { type: string }
+        alamat: { type: string, nullable: true }
+        pic_name: { type: string, nullable: true }
+        pic_phone: { type: string, nullable: true }
+
+    SchoolResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/School" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    SchoolListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/School" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    Vendor:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        nama: { type: string }
+        kategori: { type: string, nullable: true }
+        npwp: { type: string, nullable: true }
+        bank_info: { type: string, nullable: true }
+
+    VendorCreateRequest:
+      type: object
+      required: [sppg_id, nama]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        nama: { type: string }
+        kategori: { type: string, nullable: true }
+        npwp: { type: string, nullable: true }
+        bank_info: { type: string, nullable: true }
+
+    VendorResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Vendor" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    VendorListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Vendor" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- Attachments ----
+    DocType:
+      type: string
+      enum:
+        - report_daily
+        - report_biweekly
+        - report_monthly
+        - bast
+        - receipt_distribution
+        - attendance
+        - tax_deposit
+        - pettycash_report
+        - incentive_receipt
+        - bundle_zip
+        - invoice
+        - transfer_proof
+        - photo
+        - video
+        - other
+
+    FileKind:
+      type: string
+      enum: [image, pdf, video, other]
+
+    Attachment:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        doc_type: { $ref: "#/components/schemas/DocType" }
+        file_kind: { $ref: "#/components/schemas/FileKind" }
+        file_url: { type: string }
+        label: { type: string, nullable: true }
+        uploaded_by: { type: integer, format: int64, nullable: true }
+        uploaded_at: { type: string, format: date-time }
+
+    AttachmentCreateRequest:
+      type: object
+      required: [sppg_id, doc_type, file_kind, file_url]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        doc_type: { $ref: "#/components/schemas/DocType" }
+        file_kind: { $ref: "#/components/schemas/FileKind" }
+        file_url: { type: string }
+        label: { type: string, nullable: true }
+
+    AttachmentResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Attachment" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    PresignRequest:
+      type: object
+      required: [sppg_id, filename, content_type]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        filename: { type: string }
+        content_type: { type: string }
+
+    PresignResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            upload_url: { type: string }
+            file_url: { type: string }
+            expires_in: { type: integer, example: 900 }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    LinkAttachmentRequest:
+      type: object
+      required: [attachment_id]
+      properties:
+        attachment_id: { type: integer, format: int64 }
+
+    # ---- Expenses ----
+    PayMethod:
+      type: string
+      enum: [va_transfer, petty_cash]
+
+    StatusFlow:
+      type: string
+      enum: [draft, submitted, reviewed, approved, locked, rejected]
+
+    ExpenseItem:
+      type: object
+      required: [item_name, qty, unit_price]
+      properties:
+        item_name: { type: string }
+        qty: { type: number, format: double, default: 1 }
+        unit: { type: string, nullable: true }
+        unit_price: { type: number, format: double }
+        line_total: { type: number, format: double, nullable: true }
+
+    Expense:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        trx_date: { type: string, format: date }
+        vendor_id: { type: integer, format: int64, nullable: true }
+        category: { type: string }
+        pay_method: { $ref: "#/components/schemas/PayMethod" }
+        subtotal: { type: number, format: double }
+        tax_total: { type: number, format: double }
+        grand_total: { type: number, format: double }
+        notes: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/StatusFlow" }
+        created_by: { type: integer, format: int64 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ExpenseItem" }
+        attachment_ids:
+          type: array
+          items: { type: integer, format: int64 }
+
+    ExpenseCreateRequest:
+      type: object
+      required: [sppg_id, trx_date, category, pay_method, items]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        trx_date: { type: string, format: date }
+        vendor_id: { type: integer, format: int64, nullable: true }
+        category: { type: string, example: "bahan_baku" }
+        pay_method: { $ref: "#/components/schemas/PayMethod" }
+        notes: { type: string, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ExpenseItem" }
+
+    ExpenseUpdateRequest:
+      type: object
+      properties:
+        trx_date: { type: string, format: date }
+        vendor_id: { type: integer, format: int64, nullable: true }
+        category: { type: string }
+        pay_method: { $ref: "#/components/schemas/PayMethod" }
+        notes: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ExpenseItem" }
+
+    ExpenseResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Expense" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    ExpenseListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Expense" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    ActionNote:
+      type: object
+      properties:
+        note: { type: string, nullable: true }
+
+    # ---- Petty Cash ----
+    PettyCash:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        trx_date: { type: string, format: date }
+        amount: { type: number, format: double, maximum: 500000 }
+        purpose: { type: string }
+        status: { $ref: "#/components/schemas/StatusFlow" }
+        attachment_ids:
+          type: array
+          items: { type: integer, format: int64 }
+
+    PettyCashCreateRequest:
+      type: object
+      required: [sppg_id, trx_date, amount, purpose]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        trx_date: { type: string, format: date }
+        amount: { type: number, format: double, maximum: 500000 }
+        purpose: { type: string }
+
+    PettyCashUpdateRequest:
+      type: object
+      properties:
+        trx_date: { type: string, format: date }
+        amount: { type: number, format: double, maximum: 500000 }
+        purpose: { type: string }
+
+    PettyCashResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/PettyCash" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    PettyCashSummary:
+      type: object
+      properties:
+        week_start: { type: string, format: date }
+        week_end: { type: string, format: date }
+        total_amount: { type: number, format: double }
+        weekly_cap: { type: number, format: double, example: 5000000 }
+        remaining_cap: { type: number, format: double }
+
+    PettyCashListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            summary: { $ref: "#/components/schemas/PettyCashSummary" }
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PettyCash" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- VA ----
+    VaMutation:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        trx_date: { type: string, format: date }
+        direction: { type: string, enum: [in, out] }
+        amount: { type: number, format: double }
+        reference: { type: string, nullable: true }
+        attachment_id: { type: integer, format: int64, nullable: true }
+
+    VaMutationCreateRequest:
+      type: object
+      required: [sppg_id, trx_date, direction, amount]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        trx_date: { type: string, format: date }
+        direction: { type: string, enum: [in, out] }
+        amount: { type: number, format: double }
+        reference: { type: string, nullable: true }
+        attachment_id: { type: integer, format: int64, nullable: true }
+
+    VaMutationResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/VaMutation" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    VaMutationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/VaMutation" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    VaImportResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            imported: { type: integer }
+            skipped: { type: integer }
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  row: { type: integer }
+                  message: { type: string }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    VaBalanceResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            date: { type: string, format: date, nullable: true }
+            balance: { type: number, format: double }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- Taxes ----
+    Tax:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        expense_id: { type: integer, format: int64 }
+        tax_type: { type: string, example: "PPN" }
+        dpp: { type: number, format: double }
+        rate: { type: number, format: double, nullable: true }
+        amount: { type: number, format: double }
+        is_withheld: { type: boolean }
+        deposit_date: { type: string, format: date, nullable: true }
+        deposit_proof_attachment_id:
+          { type: integer, format: int64, nullable: true }
+
+    TaxCreateRequest:
+      type: object
+      required: [sppg_id, expense_id, tax_type, amount]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        expense_id: { type: integer, format: int64 }
+        tax_type: { type: string }
+        dpp: { type: number, format: double, default: 0 }
+        rate: { type: number, format: double, nullable: true }
+        amount: { type: number, format: double }
+        is_withheld: { type: boolean, default: true }
+
+    TaxUpdateRequest:
+      type: object
+      properties:
+        dpp: { type: number, format: double }
+        rate: { type: number, format: double, nullable: true }
+        amount: { type: number, format: double }
+        is_withheld: { type: boolean }
+        deposit_date: { type: string, format: date, nullable: true }
+
+    TaxResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Tax" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    TaxListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Tax" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- Distributions ----
+    Distribution:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        dist_date: { type: string, format: date }
+        school_id: { type: integer, format: int64 }
+        portions: { type: integer, minimum: 0 }
+        recipient_pic: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              kind: { type: string, enum: [receipt, photo, video, attendance] }
+              attachment_id: { type: integer, format: int64 }
+
+    DistributionCreateRequest:
+      type: object
+      required: [sppg_id, dist_date, school_id, portions]
+      properties:
+        sppg_id: { type: integer, format: int64 }
+        dist_date: { type: string, format: date }
+        school_id: { type: integer, format: int64 }
+        portions: { type: integer, minimum: 0 }
+        recipient_pic: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    DistributionLinkAttachmentRequest:
+      type: object
+      required: [kind, attachment_id]
+      properties:
+        kind: { type: string, enum: [receipt, photo, video, attendance] }
+        attachment_id: { type: integer, format: int64 }
+
+    DistributionResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Distribution" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    DistributionListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Distribution" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- Reports / BAST / Bundle ----
+    ReportType:
+      type: string
+      enum: [report_daily, report_biweekly, report_monthly]
+
+    Report:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        report_type: { $ref: "#/components/schemas/ReportType" }
+        period_start: { type: string, format: date }
+        period_end: { type: string, format: date }
+        status: { $ref: "#/components/schemas/StatusFlow" }
+        attachment_ids:
+          type: array
+          items: { type: integer, format: int64 }
+        generated_by: { type: integer, format: int64 }
+        generated_at: { type: string, format: date-time }
+        locked_at: { type: string, format: date-time, nullable: true }
+
+    ReportResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Report" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    Bast:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        report_id: { type: integer, format: int64 }
+        statement_dana_digunakan: { type: number, format: double }
+        statement_dana_diajukan: { type: number, format: double }
+        statement_dana_dibayarkan: { type: number, format: double }
+        statement_pekerjaan_selesai: { type: boolean }
+        statement_bukti_disimpan: { type: boolean }
+        attachment_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: Jika BAST digenerate jadi PDF, simpan sebagai attachment.
+
+    BastResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Bast" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    ValidateBundleResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            ok: { type: boolean }
+            missing:
+              type: array
+              items:
+                type: object
+                properties:
+                  type: { type: string }
+                  count_needed: { type: integer }
+                  count_found: { type: integer }
+            warnings:
+              type: array
+              items:
+                type: object
+                properties:
+                  type: { type: string }
+                  message: { type: string }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    Bundle:
+      type: object
+      properties:
+        report_id: { type: integer, format: int64 }
+        zip_attachment_id: { type: integer, format: int64, nullable: true }
+        zip_url: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/StatusFlow" }
+
+    BundleResponse:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Bundle" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- Approvals ----
+    ApprovalInboxItem:
+      type: object
+      properties:
+        entity_type:
+          { type: string, enum: [expense, petty_cash, report, bundle] }
+        entity_id: { type: integer, format: int64 }
+        step: { type: string, example: "review_keu" }
+        current_status: { $ref: "#/components/schemas/StatusFlow" }
+        title: { type: string, example: "Expense Belanja Bahan 2026-02-01" }
+        created_at: { type: string, format: date-time }
+
+    ApprovalInboxResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/ApprovalInboxItem" }
+        meta: { $ref: "#/components/schemas/Meta" }
+
+    # ---- Audit ----
+    AuditLog:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        sppg_id: { type: integer, format: int64 }
+        actor_user_id: { type: integer, format: int64 }
+        entity_type: { type: string }
+        entity_id: { type: integer, format: int64 }
+        action: { type: string }
+        before_json: { type: object, nullable: true }
+        after_json: { type: object, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    AuditLogListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/AuditLog" }
+        meta: { $ref: "#/components/schemas/Meta" }
